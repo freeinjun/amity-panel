@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { STATES } from '../lib/constants'
 
@@ -16,7 +16,6 @@ const linkify = (text) => {
   })
 }
 
-
 export default function Chat({ client, messages, onMessageSent }) {
   const [showRu, setShowRu] = useState(true)
   const [inputText, setInputText] = useState('')
@@ -29,9 +28,14 @@ export default function Chat({ client, messages, onMessageSent }) {
   const [uploading, setUploading] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchIndex, setSearchIndex] = useState(0)
   const messagesEndRef = useRef(null)
   const stateMenuRef = useRef(null)
   const fileInputRef = useRef(null)
+  const searchInputRef = useRef(null)
+  const msgRefs = useRef({})
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -47,6 +51,36 @@ export default function Chat({ client, messages, onMessageSent }) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  // Focus search input when opened
+  useEffect(() => {
+    if (showSearch) searchInputRef.current?.focus()
+  }, [showSearch])
+
+  // Search results
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return []
+    const q = searchQuery.toLowerCase()
+    return messages.filter(m =>
+      (m.message_text || '').toLowerCase().includes(q) ||
+      (m.message_text_ru || '').toLowerCase().includes(q) ||
+      (m.audio_transcription || '').toLowerCase().includes(q) ||
+      (m.audio_transcription_ru || '').toLowerCase().includes(q)
+    )
+  }, [messages, searchQuery])
+
+  // Scroll to current search result
+  useEffect(() => {
+    if (searchResults.length > 0 && searchResults[searchIndex]) {
+      const id = searchResults[searchIndex].id
+      msgRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [searchIndex, searchResults])
+
+  // Reset search index when query changes
+  useEffect(() => {
+    setSearchIndex(0)
+  }, [searchQuery])
+
   if (!client) {
     return (
       <div className="panel-center">
@@ -57,19 +91,15 @@ export default function Chat({ client, messages, onMessageSent }) {
 
   const state = STATES[client.current_state] || STATES.NEW
 
-  // Date separator logic
   const formatDateLabel = (dateStr) => {
     const date = new Date(dateStr)
     const today = new Date()
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-
     const isSameDay = (a, b) =>
       a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
-
     if (isSameDay(date, today)) return 'Сегодня'
     if (isSameDay(date, yesterday)) return 'Вчера'
-
     return date.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
   }
 
@@ -77,21 +107,6 @@ export default function Chat({ client, messages, onMessageSent }) {
     const d = new Date(dateStr)
     return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
   }
-
-  const changeState = async (newState) => {
-    const onboardingStates = ['COLLECTING_INFO', 'COLLECTING_PHOTOS', 'BUILDING']
-    const activeStates = ['CAMPAIGN_ACTIVE', 'TRIAL_ENDING', 'SUBSCRIBED']
-    let phase = 'sales'
-    if (onboardingStates.includes(newState)) phase = 'onboarding'
-    else if (activeStates.includes(newState)) phase = 'active'
-    else if (newState === 'LOST') phase = 'churned'
-    await supabase.from('clients')
-      .update({ current_state: newState, current_phase: phase, updated_at: new Date().toISOString() })
-      .eq('id', client.id)
-    setShowStateMenu(false)
-  }
-
-  
 
   const startEditName = () => {
     setNameInput(client.sender_name || '')
@@ -111,6 +126,19 @@ export default function Chat({ client, messages, onMessageSent }) {
   const handleNameKeyDown = (e) => {
     if (e.key === 'Enter') saveName()
     if (e.key === 'Escape') setEditingName(false)
+  }
+
+  const changeState = async (newState) => {
+    const onboardingStates = ['COLLECTING_INFO', 'COLLECTING_PHOTOS', 'BUILDING']
+    const activeStates = ['CAMPAIGN_ACTIVE', 'TRIAL_ENDING', 'SUBSCRIBED']
+    let phase = 'sales'
+    if (onboardingStates.includes(newState)) phase = 'onboarding'
+    else if (activeStates.includes(newState)) phase = 'active'
+    else if (newState === 'LOST') phase = 'churned'
+    await supabase.from('clients')
+      .update({ current_state: newState, current_phase: phase, updated_at: new Date().toISOString() })
+      .eq('id', client.id)
+    setShowStateMenu(false)
   }
 
   const togglePause = async () => {
@@ -244,13 +272,44 @@ export default function Chat({ client, messages, onMessageSent }) {
     }
   }
 
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (searchResults.length > 0) {
+        setSearchIndex(prev => (prev + 1) % searchResults.length)
+      }
+    }
+    if (e.key === 'Escape') {
+      setShowSearch(false)
+      setSearchQuery('')
+    }
+  }
+
+  const toggleSearch = () => {
+    setShowSearch(!showSearch)
+    if (showSearch) setSearchQuery('')
+  }
+
+  // Check if message is highlighted by search
+  const isHighlighted = (m) => {
+    if (!searchQuery.trim()) return false
+    return searchResults.some(r => r.id === m.id)
+  }
+
+  const isCurrentResult = (m) => {
+    if (!searchResults.length) return false
+    return searchResults[searchIndex]?.id === m.id
+  }
+
   const renderMessage = (m) => {
     const isAudio = m.media_type === 'audio'
     const isImage = m.media_type === 'image'
     const isVideo = m.media_type === 'video'
+    const highlighted = isHighlighted(m)
+    const current = isCurrentResult(m)
 
     return (
-      <div key={m.id} className={`msg-row ${m.direction}`}>
+      <div key={m.id} ref={el => msgRefs.current[m.id] = el}
+        className={`msg-row ${m.direction} ${highlighted ? 'search-hit' : ''} ${current ? 'search-current' : ''}`}>
         <div className={`msg-bubble ${m.direction}`}>
           {m.direction === 'out' && (
             <div className="msg-from">
@@ -310,11 +369,9 @@ export default function Chat({ client, messages, onMessageSent }) {
     )
   }
 
-  // Render messages with date separators
   const renderMessagesWithDates = () => {
     let lastDateKey = null
     const elements = []
-
     messages.forEach((m) => {
       const dateKey = getDateKey(m.created_at)
       if (dateKey !== lastDateKey) {
@@ -327,7 +384,6 @@ export default function Chat({ client, messages, onMessageSent }) {
       }
       elements.push(renderMessage(m))
     })
-
     return elements
   }
 
@@ -365,6 +421,9 @@ export default function Chat({ client, messages, onMessageSent }) {
           </div>
         </div>
         <div className="chat-btns">
+          <button className={`chat-btn ${showSearch ? 'active' : ''}`} onClick={toggleSearch}>
+            🔍
+          </button>
           <button className={`chat-btn ${showRu ? 'active' : ''}`} onClick={() => setShowRu(!showRu)}>
             🇷🇺 RU {showRu ? 'вкл' : 'выкл'}
           </button>
@@ -373,6 +432,26 @@ export default function Chat({ client, messages, onMessageSent }) {
           </button>
         </div>
       </div>
+
+      {showSearch && (
+        <div className="search-bar">
+          <input className="search-bar-input" ref={searchInputRef}
+            placeholder="Поиск по переписке..."
+            value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown} />
+          {searchResults.length > 0 && (
+            <div className="search-nav">
+              <span className="search-count">{searchIndex + 1}/{searchResults.length}</span>
+              <button className="search-nav-btn" onClick={() => setSearchIndex(prev => Math.max(0, prev - 1))}>▲</button>
+              <button className="search-nav-btn" onClick={() => setSearchIndex(prev => Math.min(searchResults.length - 1, prev + 1))}>▼</button>
+            </div>
+          )}
+          {searchQuery && searchResults.length === 0 && (
+            <span className="search-count">Не найдено</span>
+          )}
+          <button className="search-close" onClick={toggleSearch}>✕</button>
+        </div>
+      )}
 
       <div className="messages">
         {messages.length === 0 && <div className="empty-msg">Переписка пуста</div>}
