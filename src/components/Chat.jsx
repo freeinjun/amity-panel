@@ -18,7 +18,6 @@ export default function Chat({ client, messages, onMessageSent }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Close state menu on outside click
   useEffect(() => {
     const handleClick = (e) => {
       if (stateMenuRef.current && !stateMenuRef.current.contains(e.target)) {
@@ -40,7 +39,6 @@ export default function Chat({ client, messages, onMessageSent }) {
   const state = STATES[client.current_state] || STATES.NEW
 
   const changeState = async (newState) => {
-    // Determine phase from state
     const salesStates = ['NEW', 'QUALIFYING', 'PDF_AUDIT', 'PRESENTING_OFFER', 'PAYMENT_PENDING']
     const onboardingStates = ['COLLECTING_INFO', 'COLLECTING_PHOTOS', 'BUILDING']
     const activeStates = ['CAMPAIGN_ACTIVE', 'TRIAL_ENDING', 'SUBSCRIBED']
@@ -48,9 +46,7 @@ export default function Chat({ client, messages, onMessageSent }) {
     if (onboardingStates.includes(newState)) phase = 'onboarding'
     else if (activeStates.includes(newState)) phase = 'active'
     else if (newState === 'LOST') phase = 'churned'
-
-    await supabase
-      .from('clients')
+    await supabase.from('clients')
       .update({ current_state: newState, current_phase: phase, updated_at: new Date().toISOString() })
       .eq('id', client.id)
     setShowStateMenu(false)
@@ -154,6 +150,7 @@ export default function Chat({ client, messages, onMessageSent }) {
   const renderMessage = (m) => {
     const isAudio = m.media_type === 'audio'
     const isImage = m.media_type === 'image'
+    const isVideo = m.media_type === 'video'
 
     return (
       <div key={m.id} className={`msg-row ${m.direction}`}>
@@ -163,6 +160,7 @@ export default function Chat({ client, messages, onMessageSent }) {
               {m.sender === 'bot' || m.sender === 'jane' ? '🤖 Jane' : '👤 Denis'}
             </div>
           )}
+
           {isAudio && (
             <div className="msg-audio">
               <div className="audio-label">🎤 Голосовое сообщение</div>
@@ -186,6 +184,7 @@ export default function Chat({ client, messages, onMessageSent }) {
               )}
             </div>
           )}
+
           {isImage && m.media_url && (
             <div className="msg-image">
               <a href={m.media_url} target="_blank" rel="noopener noreferrer">
@@ -193,10 +192,21 @@ export default function Chat({ client, messages, onMessageSent }) {
               </a>
             </div>
           )}
+
+          {isVideo && m.media_url && (
+            <div className="msg-video">
+              <video controls preload="metadata" className="msg-video-player">
+                <source src={m.media_url} />
+              </video>
+            </div>
+          )}
+
           {m.message_text && <div className="msg-text">{m.message_text}</div>}
+
           {showRu && m.message_text_ru && !isAudio && (
             <div className={`msg-translation ${m.direction}`}>{m.message_text_ru}</div>
           )}
+
           <div className="msg-time">{msgTime(m.created_at)}</div>
         </div>
       </div>
