@@ -2,6 +2,21 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { STATES } from '../lib/constants'
 
+// Make URLs clickable
+const linkify = (text) => {
+  if (!text) return text
+  const urlRegex = /(https?:\/\/[^\s]+)/g
+  const parts = text.split(urlRegex)
+  if (parts.length === 1) return text
+  return parts.map((part, i) => {
+    if (part.match(urlRegex)) {
+      return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="msg-link">{part}</a>
+    }
+    return part
+  })
+}
+
+
 export default function Chat({ client, messages, onMessageSent }) {
   const [showRu, setShowRu] = useState(true)
   const [inputText, setInputText] = useState('')
@@ -259,10 +274,10 @@ export default function Chat({ client, messages, onMessageSent }) {
             </div>
           )}
 
-          {m.message_text && <div className="msg-text">{m.message_text}</div>}
+          {m.message_text && <div className="msg-text">{linkify(m.message_text)}</div>}
 
           {showRu && m.message_text_ru && !isAudio && (
-            <div className={`msg-translation ${m.direction}`}>{m.message_text_ru}</div>
+            <div className={`msg-translation ${m.direction}`}>{linkify(m.message_text_ru)}</div>
           )}
 
           <div className="msg-time">{msgTime(m.created_at)}</div>
