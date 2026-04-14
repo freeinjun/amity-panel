@@ -732,3 +732,7 @@ body { font-size: 18px; }
 /* Search highlights */
 .msg-row.search-hit .msg-bubble { box-shadow: 0 0 0 2px #FBBF24; }
 .msg-row.search-current .msg-bubble { box-shadow: 0 0 0 2px #2563EB; }
+
+/* Delete button */
+.btn-delete { color: #94A3B8; }
+.btn-delete:hover { background: #FEF2F2; border-color: #EF4444; color: #EF4444; }

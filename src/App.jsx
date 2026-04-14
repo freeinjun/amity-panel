@@ -158,7 +158,7 @@ export default function App() {
       </header>
       <div className="main">
         <ClientList clients={clients} selectedId={selectedId} onSelect={handleSelectClient} unreadIds={unreadIds} />
-        <Chat client={selectedClient} messages={messages} onMessageSent={() => {}} />
+        <Chat client={selectedClient} messages={messages} onMessageSent={() => { setSelectedId(null); setMessages([]); loadClients(); }} />
         {showAiPanel && (
           <AiPanel client={selectedClient} messages={messages} onClose={() => setShowAiPanel(false)} />
         )}

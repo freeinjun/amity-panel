@@ -141,6 +141,16 @@ export default function Chat({ client, messages, onMessageSent }) {
     setShowStateMenu(false)
   }
 
+  
+
+  const handleDeleteClient = async () => {
+    if (!window.confirm('Удалить клиента ' + client.sender_name + ' и всю переписку?')) return
+    if (!window.confirm('Точно удалить? Это нельзя отменить.')) return
+    await supabase.from('conversations').delete().eq('client_id', client.id)
+    await supabase.from('clients').delete().eq('id', client.id)
+    if (onMessageSent) onMessageSent()
+  }
+
   const togglePause = async () => {
     await supabase.from('clients').update({ is_paused: !client.is_paused }).eq('id', client.id)
   }
@@ -429,6 +439,9 @@ export default function Chat({ client, messages, onMessageSent }) {
           </button>
           <button className={`chat-btn ${client.is_paused ? 'paused' : ''}`} onClick={togglePause}>
             {client.is_paused ? '⏸ Bot paused' : '▶ Bot active'}
+          </button>
+          <button className="chat-btn btn-delete" onClick={handleDeleteClient} title="Удалить клиента">
+            🗑
           </button>
         </div>
       </div>
