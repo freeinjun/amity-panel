@@ -11,8 +11,10 @@ export default function Chat({ client, messages, onMessageSent }) {
   const [mode, setMode] = useState('translate')
   const [transcribing, setTranscribing] = useState({})
   const [showStateMenu, setShowStateMenu] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const messagesEndRef = useRef(null)
   const stateMenuRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -39,7 +41,6 @@ export default function Chat({ client, messages, onMessageSent }) {
   const state = STATES[client.current_state] || STATES.NEW
 
   const changeState = async (newState) => {
-    const salesStates = ['NEW', 'QUALIFYING', 'PDF_AUDIT', 'PRESENTING_OFFER', 'PAYMENT_PENDING']
     const onboardingStates = ['COLLECTING_INFO', 'COLLECTING_PHOTOS', 'BUILDING']
     const activeStates = ['CAMPAIGN_ACTIVE', 'TRIAL_ENDING', 'SUBSCRIBED']
     let phase = 'sales'
@@ -116,6 +117,70 @@ export default function Chat({ client, messages, onMessageSent }) {
       alert('Ошибка отправки: ' + err.message)
     }
     setSending(false)
+  }
+
+  // File upload and send
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file || !client) return
+    fileInputRef.current.value = ''
+
+    setUploading(true)
+    try {
+      // 1. Upload to Supabase Storage
+      const ext = file.name.split('.').pop()
+      const path = `${client.id}/${Date.now()}.${ext}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(path, file)
+
+      if (uploadError) throw uploadError
+
+      // 2. Get public URL
+      const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
+      const fileUrl = urlData.publicUrl
+
+      // 3. Optional caption
+      const caption = inputText.trim()
+      setInputText('')
+
+      // 4. Send via Green API
+      const { error: sendError } = await supabase.functions.invoke('send-file', {
+        body: {
+          phone: client.phone_number,
+          fileUrl: fileUrl,
+          fileName: file.name,
+          caption: caption,
+        }
+      })
+      if (sendError) console.error('Send file error:', sendError)
+
+      // 5. Determine media type
+      let mediaType = 'document'
+      if (file.type.startsWith('image/')) mediaType = 'image'
+      else if (file.type.startsWith('video/')) mediaType = 'video'
+      else if (file.type.startsWith('audio/')) mediaType = 'audio'
+
+      // 6. Save to conversations
+      await supabase.from('conversations').insert({
+        client_id: client.id, direction: 'out',
+        message_text: caption || file.name,
+        message_text_ru: caption || file.name,
+        media_url: fileUrl, media_type: mediaType,
+        sender: 'denis', bot_type: 'denis',
+        state_at_time: client.current_state,
+      })
+
+      await supabase.from('clients')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', client.id)
+
+    } catch (err) {
+      console.error('File upload error:', err)
+      alert('Ошибка загрузки: ' + err.message)
+    }
+    setUploading(false)
   }
 
   const handleTranscribe = async (msg) => {
@@ -282,6 +347,12 @@ export default function Chat({ client, messages, onMessageSent }) {
               : 'Пиши на русском → клиент получит на испанском'}
           </div>
           <div className="chat-input-row">
+            <button className="btn-attach" onClick={() => fileInputRef.current?.click()}
+              disabled={uploading} title="Прикрепить файл">
+              {uploading ? '⏳' : '📎'}
+            </button>
+            <input type="file" ref={fileInputRef} style={{ display: 'none' }}
+              onChange={handleFileSelect} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" />
             <textarea className="chat-input-field"
               placeholder={mode === 'ai' ? 'Скажи ему что можем начать завтра...' : 'Напиши сообщение...'}
               value={inputText} onChange={e => setInputText(e.target.value)}

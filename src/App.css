@@ -664,3 +664,12 @@ body { font-size: 18px; }
 /* Video messages */
 .msg-video { margin-bottom: 4px; }
 .msg-video-player { max-width: 300px; border-radius: 6px; }
+
+/* Attach button */
+.btn-attach {
+  padding: 8px 12px; border-radius: 6px; border: 1px solid #E2E8F0;
+  background: #fff; font-size: 20px; cursor: pointer; transition: all 0.15s;
+  flex-shrink: 0;
+}
+.btn-attach:hover { background: #F1F5F9; border-color: #2563EB; }
+.btn-attach:disabled { opacity: 0.5; cursor: not-allowed; }
