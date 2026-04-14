@@ -696,3 +696,12 @@ body { font-size: 18px; }
 .msg-bubble.in .msg-link { color: #2563EB; }
 .msg-bubble.out .msg-link { color: #fff; }
 .msg-translation .msg-link { color: #2563EB; font-size: inherit; }
+
+/* Editable name */
+.chat-header-name { cursor: pointer; }
+.chat-header-name:hover { color: #2563EB; }
+.name-edit-input {
+  font-size: 18px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+  border: 1px solid #2563EB; border-radius: 4px; padding: 2px 8px;
+  outline: none; width: 200px;
+}

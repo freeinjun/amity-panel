@@ -27,6 +27,8 @@ export default function Chat({ client, messages, onMessageSent }) {
   const [transcribing, setTranscribing] = useState({})
   const [showStateMenu, setShowStateMenu] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
   const messagesEndRef = useRef(null)
   const stateMenuRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -87,6 +89,28 @@ export default function Chat({ client, messages, onMessageSent }) {
       .update({ current_state: newState, current_phase: phase, updated_at: new Date().toISOString() })
       .eq('id', client.id)
     setShowStateMenu(false)
+  }
+
+  
+
+  const startEditName = () => {
+    setNameInput(client.sender_name || '')
+    setEditingName(true)
+  }
+
+  const saveName = async () => {
+    const newName = nameInput.trim()
+    if (newName && newName !== client.sender_name) {
+      await supabase.from('clients')
+        .update({ sender_name: newName, updated_at: new Date().toISOString() })
+        .eq('id', client.id)
+    }
+    setEditingName(false)
+  }
+
+  const handleNameKeyDown = (e) => {
+    if (e.key === 'Enter') saveName()
+    if (e.key === 'Escape') setEditingName(false)
   }
 
   const togglePause = async () => {
@@ -311,7 +335,15 @@ export default function Chat({ client, messages, onMessageSent }) {
     <div className="panel-center">
       <div className="chat-header">
         <div className="chat-header-left">
-          <span className="chat-header-name">{client.sender_name}</span>
+          {editingName ? (
+            <input className="name-edit-input" value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={handleNameKeyDown} onBlur={saveName} autoFocus />
+          ) : (
+            <span className="chat-header-name" onClick={startEditName} title="Нажми чтобы изменить имя">
+              {client.sender_name} ✎
+            </span>
+          )}
           <div className="state-selector" ref={stateMenuRef}>
             <span className="state-badge state-clickable" style={{
               color: state.color, background: state.bg, border: `1px solid ${state.color}33`
