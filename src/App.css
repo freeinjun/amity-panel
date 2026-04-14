@@ -660,3 +660,7 @@ body { font-size: 18px; }
 }
 .login-btn:hover { background: #1D4ED8; }
 .login-error { color: #EF4444; font-size: 14px; margin-top: 12px; }
+
+/* Video messages */
+.msg-video { margin-bottom: 4px; }
+.msg-video-player { max-width: 300px; border-radius: 6px; }
