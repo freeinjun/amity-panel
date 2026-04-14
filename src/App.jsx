@@ -3,9 +3,11 @@ import { supabase } from './lib/supabase'
 import ClientList from './components/ClientList'
 import Chat from './components/Chat'
 import AiPanel from './components/AiPanel'
+import Login from './components/Login'
 import './App.css'
 
 export default function App() {
+  const [authed, setAuthed] = useState(() => localStorage.getItem('amity_auth') === 'true')
   const [clients, setClients] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [messages, setMessages] = useState([])
@@ -78,10 +80,11 @@ export default function App() {
     })
   }, [])
 
-  useEffect(() => { loadClients() }, [loadClients])
-  useEffect(() => { loadMessages() }, [loadMessages])
+  useEffect(() => { if (authed) loadClients() }, [loadClients, authed])
+  useEffect(() => { if (authed) loadMessages() }, [loadMessages, authed])
 
   useEffect(() => {
+    if (!authed) return
     const channel = supabase
       .channel('conversations-realtime')
       .on(
@@ -101,9 +104,10 @@ export default function App() {
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [selectedId, loadClients, loadMessages])
+  }, [selectedId, loadClients, loadMessages, authed])
 
   useEffect(() => {
+    if (!authed) return
     const channel = supabase
       .channel('clients-realtime')
       .on(
@@ -113,7 +117,11 @@ export default function App() {
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [loadClients])
+  }, [loadClients, authed])
+
+  if (!authed) {
+    return <Login onLogin={() => setAuthed(true)} />
+  }
 
   const selectedClient = clients.find(c => c.id === selectedId) || null
   const totalClients = clients.length
