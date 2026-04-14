@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabase'
 import ClientList from './components/ClientList'
 import Chat from './components/Chat'
+import AiPanel from './components/AiPanel'
 import './App.css'
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [titleFlash, setTitleFlash] = useState(false)
   const [unreadIds, setUnreadIds] = useState(new Set())
+  const [showAiPanel, setShowAiPanel] = useState(false)
   const flashInterval = useRef(null)
 
   useEffect(() => {
@@ -67,7 +69,6 @@ export default function App() {
     setMessages(data || [])
   }, [selectedId])
 
-  // Select client and clear unread
   const handleSelectClient = useCallback((id) => {
     setSelectedId(id)
     setUnreadIds(prev => {
@@ -90,7 +91,6 @@ export default function App() {
           const newMsg = payload.new
           if (newMsg.direction === 'in') {
             setTitleFlash(true)
-            // Mark as unread if not currently viewing this client
             if (newMsg.client_id !== selectedId) {
               setUnreadIds(prev => new Set(prev).add(newMsg.client_id))
             }
@@ -142,16 +142,18 @@ export default function App() {
           {pendingPayment > 0 && (
             <span className="badge-red">{pendingPayment} pago pendiente</span>
           )}
+          <button className={`btn-ai-panel ${showAiPanel ? 'active' : ''}`}
+            onClick={() => setShowAiPanel(!showAiPanel)}>
+            🧠 AI
+          </button>
         </div>
       </header>
       <div className="main">
-        <ClientList
-          clients={clients}
-          selectedId={selectedId}
-          onSelect={handleSelectClient}
-          unreadIds={unreadIds}
-        />
+        <ClientList clients={clients} selectedId={selectedId} onSelect={handleSelectClient} unreadIds={unreadIds} />
         <Chat client={selectedClient} messages={messages} onMessageSent={() => {}} />
+        {showAiPanel && (
+          <AiPanel client={selectedClient} messages={messages} onClose={() => setShowAiPanel(false)} />
+        )}
       </div>
     </div>
   )
