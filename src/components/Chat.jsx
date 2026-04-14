@@ -40,6 +40,27 @@ export default function Chat({ client, messages, onMessageSent }) {
 
   const state = STATES[client.current_state] || STATES.NEW
 
+  // Date separator logic
+  const formatDateLabel = (dateStr) => {
+    const date = new Date(dateStr)
+    const today = new Date()
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    const isSameDay = (a, b) =>
+      a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
+
+    if (isSameDay(date, today)) return 'Сегодня'
+    if (isSameDay(date, yesterday)) return 'Вчера'
+
+    return date.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
+  }
+
+  const getDateKey = (dateStr) => {
+    const d = new Date(dateStr)
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  }
+
   const changeState = async (newState) => {
     const onboardingStates = ['COLLECTING_INFO', 'COLLECTING_PHOTOS', 'BUILDING']
     const activeStates = ['CAMPAIGN_ACTIVE', 'TRIAL_ENDING', 'SUBSCRIBED']
@@ -119,65 +140,37 @@ export default function Chat({ client, messages, onMessageSent }) {
     setSending(false)
   }
 
-  // File upload and send
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0]
     if (!file || !client) return
     fileInputRef.current.value = ''
-
     setUploading(true)
     try {
-      // 1. Upload to Supabase Storage
       const ext = file.name.split('.').pop()
       const path = `${client.id}/${Date.now()}.${ext}`
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(path, file)
-
+      const { error: uploadError } = await supabase.storage.from('media').upload(path, file)
       if (uploadError) throw uploadError
-
-      // 2. Get public URL
       const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
       const fileUrl = urlData.publicUrl
-
-      // 3. Optional caption
       const caption = inputText.trim()
       setInputText('')
-
-      // 4. Send via Green API
-      const { error: sendError } = await supabase.functions.invoke('send-file', {
-        body: {
-          phone: client.phone_number,
-          fileUrl: fileUrl,
-          fileName: file.name,
-          caption: caption,
-        }
+      await supabase.functions.invoke('send-file', {
+        body: { phone: client.phone_number, fileUrl, fileName: file.name, caption }
       })
-      if (sendError) console.error('Send file error:', sendError)
-
-      // 5. Determine media type
       let mediaType = 'document'
       if (file.type.startsWith('image/')) mediaType = 'image'
       else if (file.type.startsWith('video/')) mediaType = 'video'
       else if (file.type.startsWith('audio/')) mediaType = 'audio'
-
-      // 6. Save to conversations
       await supabase.from('conversations').insert({
         client_id: client.id, direction: 'out',
-        message_text: caption || file.name,
-        message_text_ru: caption || file.name,
+        message_text: caption || file.name, message_text_ru: caption || file.name,
         media_url: fileUrl, media_type: mediaType,
-        sender: 'denis', bot_type: 'denis',
-        state_at_time: client.current_state,
+        sender: 'denis', bot_type: 'denis', state_at_time: client.current_state,
       })
-
       await supabase.from('clients')
         .update({ last_message_at: new Date().toISOString() })
         .eq('id', client.id)
-
     } catch (err) {
-      console.error('File upload error:', err)
       alert('Ошибка загрузки: ' + err.message)
     }
     setUploading(false)
@@ -278,6 +271,27 @@ export default function Chat({ client, messages, onMessageSent }) {
     )
   }
 
+  // Render messages with date separators
+  const renderMessagesWithDates = () => {
+    let lastDateKey = null
+    const elements = []
+
+    messages.forEach((m) => {
+      const dateKey = getDateKey(m.created_at)
+      if (dateKey !== lastDateKey) {
+        elements.push(
+          <div key={`date-${dateKey}`} className="date-separator">
+            <span className="date-separator-text">{formatDateLabel(m.created_at)}</span>
+          </div>
+        )
+        lastDateKey = dateKey
+      }
+      elements.push(renderMessage(m))
+    })
+
+    return elements
+  }
+
   return (
     <div className="panel-center">
       <div className="chat-header">
@@ -315,7 +329,7 @@ export default function Chat({ client, messages, onMessageSent }) {
 
       <div className="messages">
         {messages.length === 0 && <div className="empty-msg">Переписка пуста</div>}
-        {messages.map(renderMessage)}
+        {renderMessagesWithDates()}
         <div ref={messagesEndRef} />
       </div>
 

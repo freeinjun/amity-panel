@@ -673,3 +673,16 @@ body { font-size: 18px; }
 }
 .btn-attach:hover { background: #F1F5F9; border-color: #2563EB; }
 .btn-attach:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Date separators */
+.date-separator {
+  display: flex; align-items: center; justify-content: center;
+  margin: 16px 0; position: relative;
+}
+.date-separator::before, .date-separator::after {
+  content: ''; flex: 1; height: 1px; background: #E2E8F0;
+}
+.date-separator-text {
+  padding: 0 14px; font-size: 12px; color: #94A3B8;
+  font-weight: 500; white-space: nowrap;
+}
