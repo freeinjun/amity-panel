@@ -469,3 +469,20 @@ body {
   background: #FEF3C7;
   border-color: #F59E0B;
 }
+
+/* Audio messages */
+.msg-audio { margin-bottom: 4px; }
+.audio-label { font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
+.audio-player { width: 100%; max-width: 280px; height: 36px; margin: 4px 0; }
+.audio-transcription { margin-top: 6px; padding-top: 6px; border-top: 1px solid #E2E8F0; }
+.audio-text-es { font-size: 12px; line-height: 1.4; }
+.audio-text-ru { font-size: 11px; color: #64748B; font-style: italic; margin-top: 4px; }
+.btn-transcribe {
+  margin-top: 6px; padding: 4px 12px; border-radius: 4px;
+  border: 1px solid #E2E8F0; background: #fff; color: #64748B;
+  font-size: 11px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+}
+.btn-transcribe:hover { background: #F1F5F9; border-color: #2563EB; color: #2563EB; }
+.btn-transcribe:disabled { opacity: 0.5; cursor: not-allowed; }
+.msg-image { margin-bottom: 4px; }
+.msg-img-preview { max-width: 240px; border-radius: 6px; cursor: pointer; }
