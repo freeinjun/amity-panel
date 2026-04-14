@@ -486,3 +486,29 @@ body {
 .btn-transcribe:disabled { opacity: 0.5; cursor: not-allowed; }
 .msg-image { margin-bottom: 4px; }
 .msg-img-preview { max-width: 240px; border-radius: 6px; cursor: pointer; }
+
+/* Unread client highlight */
+.client-item.unread {
+  background: #EFF6FF;
+  border-left-color: #2563EB;
+}
+.client-item.unread .client-name {
+  font-weight: 700;
+}
+.client-item.unread .client-lastmsg {
+  color: #1E293B;
+  font-weight: 600;
+}
+.unread-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background: #2563EB;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+.client-avatar {
+  position: relative;
+}

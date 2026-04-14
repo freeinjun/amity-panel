@@ -10,9 +10,9 @@ export default function App() {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [titleFlash, setTitleFlash] = useState(false)
+  const [unreadIds, setUnreadIds] = useState(new Set())
   const flashInterval = useRef(null)
 
-  // Title flash effect
   useEffect(() => {
     if (titleFlash) {
       let on = true
@@ -27,7 +27,6 @@ export default function App() {
     return () => clearInterval(flashInterval.current)
   }, [titleFlash])
 
-  // Stop flashing when user focuses window
   useEffect(() => {
     const handleFocus = () => setTitleFlash(false)
     window.addEventListener('focus', handleFocus)
@@ -39,7 +38,6 @@ export default function App() {
       .from('clients')
       .select('*')
       .order('last_message_at', { ascending: false })
-
     if (error) { console.error('Error loading clients:', error); return }
 
     const withLastMsg = await Promise.all(
@@ -69,10 +67,19 @@ export default function App() {
     setMessages(data || [])
   }, [selectedId])
 
+  // Select client and clear unread
+  const handleSelectClient = useCallback((id) => {
+    setSelectedId(id)
+    setUnreadIds(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
   useEffect(() => { loadClients() }, [loadClients])
   useEffect(() => { loadMessages() }, [loadMessages])
 
-  // Realtime: new messages
   useEffect(() => {
     const channel = supabase
       .channel('conversations-realtime')
@@ -80,8 +87,13 @@ export default function App() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'conversations' },
         (payload) => {
-          if (payload.new.direction === 'in') {
+          const newMsg = payload.new
+          if (newMsg.direction === 'in') {
             setTitleFlash(true)
+            // Mark as unread if not currently viewing this client
+            if (newMsg.client_id !== selectedId) {
+              setUnreadIds(prev => new Set(prev).add(newMsg.client_id))
+            }
           }
           loadMessages()
           loadClients()
@@ -91,7 +103,6 @@ export default function App() {
     return () => { supabase.removeChannel(channel) }
   }, [selectedId, loadClients, loadMessages])
 
-  // Realtime: client updates
   useEffect(() => {
     const channel = supabase
       .channel('clients-realtime')
@@ -134,7 +145,12 @@ export default function App() {
         </div>
       </header>
       <div className="main">
-        <ClientList clients={clients} selectedId={selectedId} onSelect={setSelectedId} />
+        <ClientList
+          clients={clients}
+          selectedId={selectedId}
+          onSelect={handleSelectClient}
+          unreadIds={unreadIds}
+        />
         <Chat client={selectedClient} messages={messages} onMessageSent={() => {}} />
       </div>
     </div>
