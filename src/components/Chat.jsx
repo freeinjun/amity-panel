@@ -10,11 +10,24 @@ export default function Chat({ client, messages, onMessageSent }) {
   const [sending, setSending] = useState(false)
   const [mode, setMode] = useState('translate')
   const [transcribing, setTranscribing] = useState({})
+  const [showStateMenu, setShowStateMenu] = useState(false)
   const messagesEndRef = useRef(null)
+  const stateMenuRef = useRef(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Close state menu on outside click
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (stateMenuRef.current && !stateMenuRef.current.contains(e.target)) {
+        setShowStateMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   if (!client) {
     return (
@@ -25,6 +38,23 @@ export default function Chat({ client, messages, onMessageSent }) {
   }
 
   const state = STATES[client.current_state] || STATES.NEW
+
+  const changeState = async (newState) => {
+    // Determine phase from state
+    const salesStates = ['NEW', 'QUALIFYING', 'PDF_AUDIT', 'PRESENTING_OFFER', 'PAYMENT_PENDING']
+    const onboardingStates = ['COLLECTING_INFO', 'COLLECTING_PHOTOS', 'BUILDING']
+    const activeStates = ['CAMPAIGN_ACTIVE', 'TRIAL_ENDING', 'SUBSCRIBED']
+    let phase = 'sales'
+    if (onboardingStates.includes(newState)) phase = 'onboarding'
+    else if (activeStates.includes(newState)) phase = 'active'
+    else if (newState === 'LOST') phase = 'churned'
+
+    await supabase
+      .from('clients')
+      .update({ current_state: newState, current_phase: phase, updated_at: new Date().toISOString() })
+      .eq('id', client.id)
+    setShowStateMenu(false)
+  }
 
   const togglePause = async () => {
     await supabase.from('clients').update({ is_paused: !client.is_paused }).eq('id', client.id)
@@ -92,7 +122,6 @@ export default function Chat({ client, messages, onMessageSent }) {
     setSending(false)
   }
 
-  // Transcribe audio message
   const handleTranscribe = async (msg) => {
     setTranscribing(prev => ({ ...prev, [msg.id]: true }))
     try {
@@ -100,11 +129,9 @@ export default function Chat({ client, messages, onMessageSent }) {
         body: { messageId: msg.id, mediaUrl: msg.media_url }
       })
       if (error) throw error
-      // Update local message data (realtime will also catch it)
       msg.audio_transcription = data.transcription
       msg.audio_transcription_ru = data.transcriptionRu
     } catch (err) {
-      console.error('Transcribe error:', err)
       alert('Ошибка расшифровки: ' + err.message)
     }
     setTranscribing(prev => ({ ...prev, [msg.id]: false }))
@@ -124,7 +151,6 @@ export default function Chat({ client, messages, onMessageSent }) {
     }
   }
 
-  // Render a single message
   const renderMessage = (m) => {
     const isAudio = m.media_type === 'audio'
     const isImage = m.media_type === 'image'
@@ -137,8 +163,6 @@ export default function Chat({ client, messages, onMessageSent }) {
               {m.sender === 'bot' || m.sender === 'jane' ? '🤖 Jane' : '👤 Denis'}
             </div>
           )}
-
-          {/* Audio message */}
           {isAudio && (
             <div className="msg-audio">
               <div className="audio-label">🎤 Голосовое сообщение</div>
@@ -155,18 +179,13 @@ export default function Chat({ client, messages, onMessageSent }) {
                   )}
                 </div>
               ) : (
-                <button
-                  className="btn-transcribe"
-                  onClick={() => handleTranscribe(m)}
-                  disabled={transcribing[m.id]}
-                >
+                <button className="btn-transcribe" onClick={() => handleTranscribe(m)}
+                  disabled={transcribing[m.id]}>
                   {transcribing[m.id] ? '⏳ Расшифровка...' : '🎤 Расшифровать'}
                 </button>
               )}
             </div>
           )}
-
-          {/* Image message */}
           {isImage && m.media_url && (
             <div className="msg-image">
               <a href={m.media_url} target="_blank" rel="noopener noreferrer">
@@ -174,15 +193,10 @@ export default function Chat({ client, messages, onMessageSent }) {
               </a>
             </div>
           )}
-
-          {/* Text */}
           {m.message_text && <div className="msg-text">{m.message_text}</div>}
-
-          {/* Translation */}
           {showRu && m.message_text_ru && !isAudio && (
             <div className={`msg-translation ${m.direction}`}>{m.message_text_ru}</div>
           )}
-
           <div className="msg-time">{msgTime(m.created_at)}</div>
         </div>
       </div>
@@ -194,9 +208,25 @@ export default function Chat({ client, messages, onMessageSent }) {
       <div className="chat-header">
         <div className="chat-header-left">
           <span className="chat-header-name">{client.sender_name}</span>
-          <span className="state-badge" style={{
-            color: state.color, background: state.bg, border: `1px solid ${state.color}33`
-          }}>{state.label}</span>
+          <div className="state-selector" ref={stateMenuRef}>
+            <span className="state-badge state-clickable" style={{
+              color: state.color, background: state.bg, border: `1px solid ${state.color}33`
+            }} onClick={() => setShowStateMenu(!showStateMenu)}>
+              {state.label} ▾
+            </span>
+            {showStateMenu && (
+              <div className="state-dropdown">
+                {Object.entries(STATES).map(([key, val]) => (
+                  <div key={key}
+                    className={`state-option ${key === client.current_state ? 'current' : ''}`}
+                    onClick={() => changeState(key)}>
+                    <span className="state-dot" style={{ background: val.color }}></span>
+                    {val.label}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="chat-btns">
           <button className={`chat-btn ${showRu ? 'active' : ''}`} onClick={() => setShowRu(!showRu)}>

@@ -512,3 +512,24 @@ body {
 .client-avatar {
   position: relative;
 }
+
+/* State selector dropdown */
+.state-selector { position: relative; display: inline-block; }
+.state-clickable { cursor: pointer; }
+.state-clickable:hover { opacity: 0.8; }
+.state-dropdown {
+  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100;
+  min-width: 180px; padding: 4px; max-height: 320px; overflow-y: auto;
+}
+.state-option {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 4px; cursor: pointer;
+  font-size: 13px; color: #1E293B;
+}
+.state-option:hover { background: #F1F5F9; }
+.state-option.current { background: #EFF6FF; font-weight: 600; }
+.state-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
