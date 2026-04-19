@@ -13,10 +13,13 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json()
-
-    // Green API sends different webhook types
     const messageType = body.typeWebhook
-    if (messageType !== "incomingMessageReceived") {
+    console.log("WEBHOOK:", messageType)
+
+    const isIncoming = messageType === "incomingMessageReceived"
+    const isOutgoing = messageType === "outgoingMessageReceived" || messageType === "outgoingAPIMessageReceived"
+
+    if (!isIncoming && !isOutgoing) {
       return new Response(JSON.stringify({ ok: true, skipped: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
@@ -24,10 +27,19 @@ Deno.serve(async (req) => {
 
     const messageData = body.messageData
     const senderData = body.senderData
-    const phone = senderData?.chatId || senderData?.sender || ""
-    const senderName = senderData?.senderName || senderData?.chatName || ""
+    let phone = ""
+    let senderName = ""
 
-    // Extract message text
+    if (isIncoming) {
+      phone = senderData?.chatId || senderData?.sender || ""
+      senderName = senderData?.senderName || senderData?.chatName || ""
+    } else {
+      phone = body.chatId || senderData?.chatId || ""
+      senderName = senderData?.senderName || senderData?.chatName || ""
+    }
+
+    console.log("FROM:", phone, "NAME:", senderName, "DIR:", isIncoming ? "in" : "out")
+
     let messageText = ""
     let mediaType = "text"
     let mediaUrl = ""
@@ -55,13 +67,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Init Supabase
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     )
 
-    // Find or create client
     let { data: client } = await supabase
       .from("clients")
       .select("*")
@@ -88,7 +98,24 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Translate to Russian via Claude
+    if (isOutgoing && messageText) {
+      const { data: existing } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("client_id", client.id)
+        .eq("message_text", messageText)
+        .eq("direction", "out")
+        .gte("created_at", new Date(Date.now() - 30000).toISOString())
+        .limit(1)
+
+      if (existing && existing.length > 0) {
+        console.log("SKIP: already saved from panel")
+        return new Response(JSON.stringify({ ok: true, skipped: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        })
+      }
+    }
+
     let messageTextRu = ""
     if (messageText && mediaType === "text") {
       try {
@@ -114,26 +141,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Save message
+    const sender = isIncoming ? "client" : "bot"
+    const direction = isIncoming ? "in" : "out"
+
     await supabase.from("conversations").insert({
       client_id: client.id,
-      direction: "in",
+      direction: direction,
       message_text: messageText,
       message_text_ru: messageTextRu,
       media_type: mediaType,
       media_url: mediaUrl,
-      sender: "client",
+      sender: sender,
+      bot_type: isOutgoing ? "jane" : null,
       state_at_time: client.current_state,
     })
 
-    // Update last_message_at
-    await supabase
-      .from("clients")
-      .update({
-        last_message_at: new Date().toISOString(),
-        sender_name: senderName || client.sender_name,
-      })
-      .eq("id", client.id)
+    await supabase.from("clients").update({
+      last_message_at: new Date().toISOString(),
+      sender_name: isIncoming ? (senderName || client.sender_name) : client.sender_name,
+    }).eq("id", client.id)
+
+    console.log("SAVED:", direction, phone)
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

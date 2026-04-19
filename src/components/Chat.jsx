@@ -148,7 +148,7 @@ export default function Chat({ client, messages, onMessageSent }) {
     if (!window.confirm('Точно удалить? Это нельзя отменить.')) return
     await supabase.from('conversations').delete().eq('client_id', client.id)
     await supabase.from('clients').delete().eq('id', client.id)
-    if (onMessageSent) onMessageSent()
+    if (onMessageSent) onMessageSent('deleted')
   }
 
   const togglePause = async () => {
