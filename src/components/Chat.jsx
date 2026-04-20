@@ -262,10 +262,9 @@ export default function Chat({ client, messages, onMessageSent }) {
         body: { text: msg.message_text, from: 'es', to: 'ru' }
       })
       if (error) throw error
-      await supabase.from('conversations')
+      const { error: updateError } = await supabase.from('conversations')
         .update({ message_text_ru: data.translated })
         .eq('id', msg.id)
-      msg.message_text_ru = data.translated
       if (onMessageSent) onMessageSent()
     } catch (err) {
       console.error('Retranslate error:', err)
