@@ -253,6 +253,25 @@ export default function Chat({ client, messages, onMessageSent }) {
     setUploading(false)
   }
 
+
+  const handleRetranslate = async (msg) => {
+    if (!msg.message_text) return
+    setTranscribing(prev => ({ ...prev, ['tr_' + msg.id]: true }))
+    try {
+      const { data, error } = await supabase.functions.invoke('translate', {
+        body: { text: msg.message_text, from: 'es', to: 'ru' }
+      })
+      if (error) throw error
+      await supabase.from('conversations')
+        .update({ message_text_ru: data.translated })
+        .eq('id', msg.id)
+      msg.message_text_ru = data.translated
+    } catch (err) {
+      console.error('Retranslate error:', err)
+    }
+    setTranscribing(prev => ({ ...prev, ['tr_' + msg.id]: false }))
+  }
+
   const handleTranscribe = async (msg) => {
     setTranscribing(prev => ({ ...prev, [msg.id]: true }))
     try {
@@ -371,6 +390,12 @@ export default function Chat({ client, messages, onMessageSent }) {
 
           {showRu && m.message_text_ru && !isAudio && (
             <div className={`msg-translation ${m.direction}`}>{linkify(m.message_text_ru)}</div>
+          )}
+          {showRu && !m.message_text_ru && m.message_text && !isAudio && (
+            <button className="btn-retranslate" onClick={() => handleRetranslate(m)}
+              disabled={transcribing['tr_' + m.id]}>
+              {transcribing['tr_' + m.id] ? '⏳' : '🔄 Перевести'}
+            </button>
           )}
 
           <div className="msg-time">{msgTime(m.created_at)}</div>
