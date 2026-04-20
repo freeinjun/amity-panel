@@ -266,6 +266,7 @@ export default function Chat({ client, messages, onMessageSent }) {
         .update({ message_text_ru: data.translated })
         .eq('id', msg.id)
       msg.message_text_ru = data.translated
+      if (onMessageSent) onMessageSent()
     } catch (err) {
       console.error('Retranslate error:', err)
     }
