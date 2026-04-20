@@ -391,7 +391,7 @@ export default function Chat({ client, messages, onMessageSent }) {
           {showRu && m.message_text_ru && !isAudio && (
             <div className={`msg-translation ${m.direction}`}>{linkify(m.message_text_ru)}</div>
           )}
-          {showRu && !m.message_text_ru && m.message_text && !isAudio && (
+          {showRu && m.message_text && !isAudio && (!m.message_text_ru || m.message_text_ru === m.message_text) && (
             <button className="btn-retranslate" onClick={() => handleRetranslate(m)}
               disabled={transcribing['tr_' + m.id]}>
               {transcribing['tr_' + m.id] ? '⏳' : '🔄 Перевести'}
