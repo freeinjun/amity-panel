@@ -158,6 +158,15 @@ export default function Chat({ client, messages, onMessageSent }) {
   const handleTranslate = async () => {
     const text = inputText.trim()
     if (!text) return
+
+    // If text has no Russian letters, it's already in Spanish - don't translate
+    const hasCyrillic = /[а-яА-ЯёЁ]/.test(text)
+    if (!hasCyrillic) {
+      setPreview({ ru: '', es: text })
+      setInputText('')
+      return
+    }
+
     setTranslating(true)
     try {
       const { data, error } = await supabase.functions.invoke('translate', {
